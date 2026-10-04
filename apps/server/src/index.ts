@@ -154,14 +154,14 @@ app.post('/api/conversations/group', requireAuth, (req: AuthedRequest, res) => {
 });
 
 app.get('/api/conversations/:id/messages', requireAuth, (req: AuthedRequest, res) => {
-  if (!isMember(req.params.id, req.user!.id)) return res.status(403).json({ error: 'Forbidden' });
+  if (!isMember(String(req.params.id), req.user!.id)) return res.status(403).json({ error: 'Forbidden' });
   const rows = db.prepare('SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at ASC LIMIT 300').all(req.params.id) as any[];
   const rx = reactionMap(rows.map(r => r.id));
   res.json(rows.map(row => viewMessage(row, req.user!.id, rx.get(row.id) || [])));
 });
 
 app.post('/api/conversations/:id/messages', requireAuth, (req: AuthedRequest, res) => {
-  const conversationId = req.params.id;
+  const conversationId = String(req.params.id);
   if (!isMember(conversationId, req.user!.id)) return res.status(403).json({ error: 'Forbidden' });
   const parsed = z.object({ envelopes: z.record(z.object({ ephemeralPublicKey: z.string(), nonce: z.string(), ciphertext: z.string() })), type: z.enum(['text','image']).default('text'), replyToId: z.string().nullable().optional() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid encrypted message' });
