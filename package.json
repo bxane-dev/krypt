@@ -1,0 +1,18 @@
+{
+  "name": "krypt",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "concurrently -n server,web -c auto \"npm run dev -w @krypt/server\" \"npm run dev -w @krypt/web\"",
+    "build": "npm run build -w @krypt/server && npm run build -w @krypt/web",
+    "test": "npm run test -w @krypt/web",
+    "start": "npm run start -w @krypt/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
