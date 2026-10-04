@@ -3,7 +3,11 @@
   "version": "0.2.0",
   "private": true,
   "description": "Open-source encrypted chat for web and desktop",
-  "author": "bxane-dev",
+  "author": {
+    "name": "bxane-dev",
+    "email": "noreply@github.com",
+    "url": "https://github.com/bxane-dev"
+  },
   "license": "MIT",
   "main": "apps/desktop/dist/main.js",
   "workspaces": [
@@ -74,7 +78,10 @@
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "maintainer": "bxane-dev <noreply@github.com>",
+      "desktopName": "KRYPT",
+      "syncDesktopName": true
     }
   }
 }
