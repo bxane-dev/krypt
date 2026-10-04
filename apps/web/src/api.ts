@@ -1,4 +1,24 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+function resolveApiUrl() {
+  if (typeof window !== 'undefined') {
+    const localOverride = new URLSearchParams(window.location.search).get('desktopApi');
+    if (localOverride) {
+      try {
+        const url = new URL(localOverride);
+        if (url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost')) {
+          return url.origin;
+        }
+      } catch {
+        // Ignore malformed desktop-only overrides.
+      }
+    }
+  }
+
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, '');
+  return 'http://localhost:8787';
+}
+
+const API_URL = resolveApiUrl();
 
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('krypt_token');
