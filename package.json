@@ -79,9 +79,7 @@
         "AppImage",
         "deb"
       ],
-      "maintainer": "bxane-dev <noreply@github.com>",
-      "desktopName": "KRYPT",
-      "syncDesktopName": true
+      "maintainer": "bxane-dev <noreply@github.com>"
     }
   }
 }
