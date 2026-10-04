@@ -4,6 +4,12 @@ import type { Envelope, Payload, User } from './types';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function webCryptoBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 export const toBase64 = (bytes: Uint8Array) => {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -18,7 +24,7 @@ export const fromBase64 = (value: string) => {
 async function deriveBackupKey(password: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210_000 },
+    { name: 'PBKDF2', hash: 'SHA-256', salt: webCryptoBuffer(salt), iterations: 210_000 },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -31,7 +37,7 @@ export async function createIdentity(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveBackupKey(password, salt);
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, pair.secretKey));
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: webCryptoBuffer(iv) }, key, webCryptoBuffer(pair.secretKey)));
   const backup = new Uint8Array(iv.length + encrypted.length);
   backup.set(iv, 0);
   backup.set(encrypted, iv.length);
@@ -48,7 +54,7 @@ export async function restoreIdentity(password: string, keyBackup: string, keySa
   const iv = backup.slice(0, 12);
   const encrypted = backup.slice(12);
   const key = await deriveBackupKey(password, fromBase64(keySalt));
-  const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+  const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: webCryptoBuffer(iv) }, key, webCryptoBuffer(encrypted));
   return toBase64(new Uint8Array(raw));
 }
 
