@@ -1,0 +1,14 @@
+{
+  "name": "@krypt/desktop",
+  "version": "0.2.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "electron": "44.5.1",
+    "typescript": "^5.8.3"
+  }
+}

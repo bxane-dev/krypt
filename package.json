@@ -1,18 +1,80 @@
 {
   "name": "krypt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "workspaces": ["apps/*"],
+  "description": "Open-source encrypted chat for web and desktop",
+  "author": "bxane-dev",
+  "license": "MIT",
+  "main": "apps/desktop/dist/main.js",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "concurrently -n server,web -c auto \"npm run dev -w @krypt/server\" \"npm run dev -w @krypt/web\"",
-    "build": "npm run build -w @krypt/server && npm run build -w @krypt/web",
+    "build": "npm run build -w @krypt/server && npm run build -w @krypt/web && npm run build -w @krypt/desktop",
     "test": "npm run test -w @krypt/web",
-    "start": "npm run start -w @krypt/server"
+    "start": "npm run start -w @krypt/server",
+    "desktop:dev": "npm run build && electron .",
+    "desktop:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "desktop:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "desktop:dist": "npm run build && electron-builder --publish never"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^11.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.1.5",
+    "socket.io": "^4.8.1",
+    "zod": "^3.25.36"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "electron": "44.5.1",
+    "electron-builder": "^26.0.0"
   },
   "engines": {
     "node": ">=20"
+  },
+  "build": {
+    "appId": "dev.bxane.krypt",
+    "productName": "KRYPT",
+    "artifactName": "KRYPT-${version}-${os}-${arch}.${ext}",
+    "asar": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "apps/desktop/dist/**/*",
+      "apps/server/dist/**/*",
+      "apps/server/package.json",
+      "apps/web/dist/**/*",
+      "package.json"
+    ],
+    "npmRebuild": true,
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KRYPT",
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "category": "Network",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
   }
 }
