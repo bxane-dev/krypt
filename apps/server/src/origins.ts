@@ -28,11 +28,16 @@ function isDesktopLoopbackOrigin(origin: string) {
   }
 }
 
-export function createOriginPolicy(allowed: string[], allowDesktop: boolean) {
+function isMobileOrigin(origin: string) {
+  return origin === 'https://localhost' || origin === 'capacitor://localhost';
+}
+
+export function createOriginPolicy(allowed: string[], allowDesktop: boolean, allowMobile = false) {
   const exact = new Set(allowed.map(normalizeOrigin));
   return (origin?: string) => {
     if (!origin) return true;
     if (exact.has(origin)) return true;
+    if (allowMobile && isMobileOrigin(origin)) return true;
     return allowDesktop && isDesktopLoopbackOrigin(origin);
   };
 }

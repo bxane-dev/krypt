@@ -17,6 +17,8 @@ services:
         value: "true"
       - key: ALLOW_DESKTOP_ORIGINS
         value: "true"
+      - key: ALLOW_MOBILE_ORIGINS
+        value: "true"
       - key: WEB_ORIGINS
         sync: false
       - key: JWT_SECRET

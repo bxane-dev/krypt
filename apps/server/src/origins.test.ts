@@ -17,6 +17,18 @@ test('origin policy allows exact configured origins and non-browser clients', ()
   assert.equal(policy('https://evil.example.com'), false);
 });
 
+test('mobile native origins are opt-in and exact', () => {
+  const disabled = createOriginPolicy([], false, false);
+  assert.equal(disabled('https://localhost'), false);
+  assert.equal(disabled('capacitor://localhost'), false);
+
+  const enabled = createOriginPolicy([], false, true);
+  assert.equal(enabled('https://localhost'), true);
+  assert.equal(enabled('capacitor://localhost'), true);
+  assert.equal(enabled('https://localhost.evil.example'), false);
+  assert.equal(enabled('capacitor://evil.example'), false);
+});
+
 test('desktop loopback origins are opt-in and strictly validated', () => {
   const disabled = createOriginPolicy([], false);
   assert.equal(disabled('http://127.0.0.1:49152'), false);
