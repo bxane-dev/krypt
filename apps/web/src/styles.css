@@ -191,6 +191,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .profile-editor { padding: 20px 14px 6px; display: flex; align-items: center; gap: 14px; }.file-button input { display: none; }
 
 .modal-server-button { width: calc(100% - 28px); margin: 14px 14px 4px; }
+
+.device-section { margin: 14px; border: 1px solid #252a31; background: #0d0f13; border-radius: 11px; padding: 12px; }
+.device-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; color: #858c96; }
+.device-section-head > div { display: grid; gap: 3px; }
+.device-section-head b { color: #d4d8de; font-size: 11px; }
+.device-section-head span { color: #737b85; font-size: 10px; }
+.device-list { display: grid; gap: 7px; }
+.device-row { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px; border: 1px solid #20252c; background: #101318; border-radius: 9px; }
+.device-row.revoked { opacity: .55; }
+.device-icon { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 8px; background: #191d23; color: #a5acb5; }
+.device-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.device-copy b { font-size: 10px; color: #cdd1d7; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.device-copy span { font-size: 9px; color: #6f7781; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.device-action { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border: 1px solid #2a3038; background: #15191e; color: #aab1ba; border-radius: 8px; cursor: pointer; }
+.device-action:hover { background: #1d2229; color: #fff; }
+.device-action.danger { color: #d98c8c; border-color: rgba(255,107,107,.2); }
+.device-action:disabled { opacity: .35; cursor: default; }
+.device-revoked { font-size: 9px; color: #8b6262; text-transform: uppercase; letter-spacing: .08em; }
 .connection-card { margin: 14px; display: flex; gap: 10px; align-items: flex-start; border: 1px solid #252a31; background: #101216; border-radius: 10px; padding: 12px; color: #9aa1aa; }
 .connection-card svg { flex: 0 0 auto; margin-top: 1px; }
 .connection-card div { min-width: 0; }
