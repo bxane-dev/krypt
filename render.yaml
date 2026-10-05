@@ -13,6 +13,8 @@ services:
     envVars:
       - key: HOST
         value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "true"
       - key: ALLOW_DESKTOP_ORIGINS
         value: "true"
       - key: WEB_ORIGINS
