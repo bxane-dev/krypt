@@ -80,20 +80,31 @@ function createDeviceSession(user: { id: string; username: string }, input?: z.i
       at
     );
   } else {
+    const priorSessions = db.prepare(
+      'SELECT id FROM sessions WHERE device_id=? AND user_id=? AND revoked_at IS NULL'
+    ).all(deviceId, user.id) as any[];
+    const incomingKey = (device.publicKey || '').slice(0, 500);
     db.prepare(`
       UPDATE devices
-      SET name=?, platform=?, public_key=CASE WHEN ?<>'' THEN ? ELSE public_key END, last_seen_at=?
+      SET name=?,
+          platform=?,
+          key_version=CASE WHEN ?<>'' AND public_key<>? THEN key_version+1 ELSE key_version END,
+          public_key=CASE WHEN ?<>'' THEN ? ELSE public_key END,
+          last_seen_at=?
       WHERE id=? AND user_id=?
     `).run(
       normalizeDeviceLabel(device.name),
       (device.platform || 'Legacy').slice(0, 48),
-      device.publicKey || '',
-      device.publicKey || '',
+      incomingKey,
+      incomingKey,
+      incomingKey,
+      incomingKey,
       at,
       deviceId,
       user.id
     );
     db.prepare('UPDATE sessions SET revoked_at=? WHERE device_id=? AND revoked_at IS NULL').run(at, deviceId);
+    revokeSessions(priorSessions.map(row => row.id));
   }
 
   const sessionId = nanoid();
