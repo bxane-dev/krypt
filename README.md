@@ -107,6 +107,7 @@ Recommended production changes before public launch:
 | Variable | Purpose |
 | --- | --- |
 | `HOST` | Bind address; use `0.0.0.0` for hosted services |
+| `TRUST_PROXY` | Trust one reverse-proxy hop for accurate client IP throttling; enabled by the Render Blueprint |
 | `PORT` | API port, defaults to `8787` |
 | `WEB_ORIGINS` | Comma-separated browser origins allowed by CORS |
 | `WEB_ORIGIN` | Legacy single-origin fallback |
