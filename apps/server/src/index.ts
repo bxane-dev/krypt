@@ -13,6 +13,7 @@ import { createOriginPolicy, parseAllowedOrigins } from './origins.js';
 import { createAttemptLimiter, normalizeDeviceLabel } from './security.js';
 
 const app = express();
+if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 const server = http.createServer(app);
 const allowedOrigins = parseAllowedOrigins(
   process.env.WEB_ORIGINS,
@@ -45,7 +46,8 @@ const deviceSchema = z.object({
 }).optional();
 
 function authIdentityKey(req: express.Request) {
-  return String(req.body?.username || '').trim().toLowerCase() || 'anonymous';
+  const username = String(req.body?.username || '').trim().toLowerCase() || 'anonymous';
+  return `${req.ip || 'unknown'}|${username}`;
 }
 
 function authRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -181,7 +183,7 @@ app.post('/api/auth/register', authRateLimit, async (req, res) => {
   db.prepare(`INSERT INTO users (id,username,display_name,password_hash,public_key,key_backup,key_salt,created_at) VALUES (?,?,?,?,?,?,?,?)`)
     .run(id, username, displayName, passwordHash, publicKey, keyBackup, keySalt, now());
   const session = createDeviceSession({ id, username }, device);
-  authIdentityLimiter.reset(username);
+  authIdentityLimiter.reset(authIdentityKey(req));
   res.status(201).json({ ...session, user: { id, username, displayName, publicKey, avatarUrl: null }, keyBackup, keySalt });
 });
 
@@ -195,7 +197,7 @@ app.post('/api/auth/login', authRateLimit, async (req, res) => {
   const row = db.prepare('SELECT * FROM users WHERE username=?').get(parsed.data.username) as any;
   if (!row || !(await bcrypt.compare(parsed.data.password, row.password_hash))) return res.status(401).json({ error: 'Invalid username or password' });
   const session = createDeviceSession({ id: row.id, username: row.username }, parsed.data.device);
-  authIdentityLimiter.reset(parsed.data.username);
+  authIdentityLimiter.reset(authIdentityKey(req));
   res.json({ ...session, user: { id: row.id, username: row.username, displayName: row.display_name, publicKey: row.public_key, avatarUrl: row.avatar_url }, keyBackup: row.key_backup, keySalt: row.key_salt });
 });
 
