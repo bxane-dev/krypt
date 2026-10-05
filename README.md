@@ -1,6 +1,6 @@
 # KRYPT 🔐
 
-KRYPT is an open-source encrypted chat application with accounts, direct messages, groups, reactions, image sharing, replies, editing/deletion, typing indicators, presence, and a browser-side encryption layer.
+KRYPT is an open-source encrypted chat application for Android, iPhone, web, and desktop with accounts, direct messages, groups, reactions, image sharing, replies, editing/deletion, typing indicators, presence, and client-side encryption. KRYPT's current release priority is mobile-first.
 
 > **Security status:** KRYPT currently implements an end-to-end encrypted MVP using NaCl public-key boxes and password-encrypted key backup. Message plaintext is encrypted in the browser before it reaches the API. This implementation has **not** been independently audited and does **not** yet implement Signal's Double Ratchet or MLS forward secrecy. Do not market this release as a Signal-equivalent secure messenger until the crypto layer is replaced/audited.
 
@@ -24,6 +24,7 @@ KRYPT is an open-source encrypted chat application with accounts, direct message
 
 ## Stack
 
+- **Mobile:** Capacitor 8.5.2, Android SDK 36, native iOS/Xcode project generation
 - **Web:** React, TypeScript, Vite, TweetNaCl, Socket.IO client
 - **Server:** Node.js, Express, TypeScript, Socket.IO, SQLite
 - **Security:** NaCl box encryption in-browser, PBKDF2 + AES-GCM private-key backup, bcrypt password hashing, JWTs backed by revocable server sessions
@@ -75,6 +76,29 @@ The Blueprint uses a **Starter** web service because persistent disks are not a 
 
 After the Blueprint is applied, set `WEB_ORIGINS` to any browser origins that should be allowed, comma-separated. Installed Electron clients are covered by `ALLOW_DESKTOP_ORIGINS=true`.
 
+## Mobile builds
+
+KRYPT 0.5.0 is mobile-first.
+
+```bash
+npm install
+npm run mobile:web
+
+# Create once locally, then sync after web changes
+npx cap add android
+npx cap add ios --packagemanager SPM
+npx cap sync
+```
+
+GitHub Actions builds both platforms:
+
+- **Android APK:** debug-signed and directly installable on Android.
+- **iOS IPA:** native iPhoneOS Release build packaged as an unsigned IPA. Apple signing is required before installation on a stock iPhone, TestFlight, or App Store distribution. See `docs/ios-signing.md`.
+
+The hosted KRYPT API supports the native WebView origins only when `ALLOW_MOBILE_ORIGINS=true`. The included Render Blueprint enables this.
+
+Desktop packaging remains in the repository but is manual-only while Android/iOS are the release priority. macOS desktop packaging will be added after the mobile release path is stable.
+
 ## Production
 
 Build everything:
@@ -111,7 +135,8 @@ Recommended production changes before public launch:
 | `PORT` | API port, defaults to `8787` |
 | `WEB_ORIGINS` | Comma-separated browser origins allowed by CORS |
 | `WEB_ORIGIN` | Legacy single-origin fallback |
-| `ALLOW_DESKTOP_ORIGINS` | When `true`, allow HTTP loopback origins used by installed clients |
+| `ALLOW_DESKTOP_ORIGINS` | When `true`, allow HTTP loopback origins used by installed desktop clients |
+| `ALLOW_MOBILE_ORIGINS` | When `true`, allow KRYPT's native Capacitor Android/iOS WebView origins |
 | `JWT_SECRET` | Long random JWT signing secret |
 | `DATABASE_PATH` | SQLite database path |
 | `VITE_API_URL` | Optional web build-time API URL |
@@ -125,7 +150,11 @@ apps/
   desktop/  Electron desktop runtime
 .github/
   workflows/ci.yml
+  workflows/mobile-build.yml
   workflows/desktop-release.yml
+docs/
+  ios-signing.md
+capacitor.config.ts
 render.yaml  Render shared-server Blueprint
 ```
 
