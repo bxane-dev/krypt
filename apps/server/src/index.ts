@@ -20,7 +20,8 @@ const allowedOrigins = parseAllowedOrigins(
   process.env.WEB_ORIGIN || 'http://localhost:5173'
 );
 const allowDesktopOrigins = process.env.ALLOW_DESKTOP_ORIGINS === 'true';
-const originPolicy = createOriginPolicy(allowedOrigins, allowDesktopOrigins);
+const allowMobileOrigins = process.env.ALLOW_MOBILE_ORIGINS === 'true';
+const originPolicy = createOriginPolicy(allowedOrigins, allowDesktopOrigins, allowMobileOrigins);
 const corsOptions = {
   origin(origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) {
     if (originPolicy(origin)) return callback(null, true);
