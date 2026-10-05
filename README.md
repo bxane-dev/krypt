@@ -14,6 +14,7 @@ KRYPT is an open-source encrypted chat application with accounts, direct message
 - Replies, edit, delete, and emoji reactions
 - Live typing indicators and online presence via Socket.IO
 - Responsive three-pane chat UI
+- Selectable shared-server connection for web and installed desktop clients
 - SQLite persistence with zero external database requirement
 - MIT licensed
 
@@ -34,6 +35,29 @@ npm run dev
 Open `http://localhost:5173`.
 
 The API runs on `http://localhost:8787` by default.
+
+## Shared server mode
+
+KRYPT clients can connect to one shared HTTPS server instead of using the bundled local desktop server. Open **Server** from the login screen or **Profile & security**, enter the shared KRYPT server origin (for example `https://krypt.example.com`), and KRYPT verifies `/api/health` before switching.
+
+Changing servers clears the local login session and encryption secret. Accounts and password-encrypted private-key backups belong to the server where the account was created.
+
+Remote server URLs must use HTTPS. Plain HTTP is accepted only for `localhost` and `127.0.0.1` development servers.
+
+### Render deployment
+
+The repository includes `render.yaml` for a persistent single-instance shared API in Frankfurt:
+
+- Node 22 runtime
+- `/api/health` health check
+- persistent SQLite database at `/var/data/krypt.db`
+- desktop loopback origins enabled for installed clients
+- generated JWT signing secret
+- deploys gated on GitHub checks
+
+The Blueprint uses a **Starter** web service because persistent disks are not a free-service feature. The attached SQLite disk also means the service remains single-instance. Move the shared API to PostgreSQL/libSQL before horizontal scaling.
+
+After the Blueprint is applied, set `WEB_ORIGINS` to any browser origins that should be allowed, comma-separated. Installed Electron clients are covered by `ALLOW_DESKTOP_ORIGINS=true`.
 
 ## Production
 
@@ -65,8 +89,11 @@ Recommended production changes before public launch:
 
 | Variable | Purpose |
 | --- | --- |
+| `HOST` | Bind address; use `0.0.0.0` for hosted services |
 | `PORT` | API port, defaults to `8787` |
-| `WEB_ORIGIN` | Allowed browser origin |
+| `WEB_ORIGINS` | Comma-separated browser origins allowed by CORS |
+| `WEB_ORIGIN` | Legacy single-origin fallback |
+| `ALLOW_DESKTOP_ORIGINS` | When `true`, allow HTTP loopback origins used by installed clients |
 | `JWT_SECRET` | Long random JWT signing secret |
 | `DATABASE_PATH` | SQLite database path |
 | `VITE_API_URL` | Optional web build-time API URL |
@@ -77,8 +104,11 @@ Recommended production changes before public launch:
 apps/
   server/   Express + Socket.IO + SQLite API
   web/      React/Vite encrypted chat client
+  desktop/  Electron desktop runtime
 .github/
   workflows/ci.yml
+  workflows/desktop-release.yml
+render.yaml  Render shared-server Blueprint
 ```
 
 ## License
