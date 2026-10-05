@@ -375,7 +375,7 @@ io.use((socket, next) => {
 
 const online = new Map<string, number>();
 io.on('connection', socket => {
-  const user = socket.data.user as { id: string; username: string };
+  const user = socket.data.user as { id: string; username: string; sessionId: string; deviceId: string };
   socket.join(`user:${user.id}`);
   socket.join(`session:${user.sessionId}`);
   const rows = db.prepare('SELECT conversation_id as id FROM conversation_members WHERE user_id=?').all(user.id) as any[];
