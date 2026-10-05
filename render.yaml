@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: krypt-api
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    autoDeployTrigger: checksPass
+    rootDir: apps/server
+    buildCommand: npm install --no-audit --no-fund && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOW_DESKTOP_ORIGINS
+        value: "true"
+      - key: WEB_ORIGINS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/krypt.db
+    disk:
+      name: krypt-data
+      mountPath: /var/data
+      sizeGB: 1

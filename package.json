@@ -1,6 +1,6 @@
 {
   "name": "krypt",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Open-source encrypted chat for web and desktop",
   "author": {
@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "concurrently -n server,web -c auto \"npm run dev -w @krypt/server\" \"npm run dev -w @krypt/web\"",
     "build": "npm run build -w @krypt/server && npm run build -w @krypt/web && npm run build -w @krypt/desktop",
-    "test": "npm run test -w @krypt/web",
+    "test": "npm run test -w @krypt/server && npm run test -w @krypt/web",
     "start": "npm run start -w @krypt/server",
     "desktop:dev": "npm run build && electron .",
     "desktop:win": "npm run build && electron-builder --win nsis --x64 --publish never",
@@ -41,7 +41,7 @@
     "electron-builder": "^26.0.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "build": {
     "appId": "dev.bxane.krypt",

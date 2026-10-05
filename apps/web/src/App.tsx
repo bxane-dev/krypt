@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, t
 import { io, type Socket } from 'socket.io-client';
 import {
   ArrowLeft, Check, Image as ImageIcon, LockKeyhole, LogOut, Menu, MessageCircle,
-  MoreHorizontal, Paperclip, Pencil, Plus, Reply, Search, Send, Settings, ShieldCheck,
+  MoreHorizontal, Paperclip, Pencil, Plus, Reply, Search, Send, Server, Settings, ShieldCheck,
   SmilePlus, Trash2, UserPlus, Users, X
 } from 'lucide-react';
 import { api, API_URL } from './api';
 import { createIdentity, decryptEnvelope, encryptForMembers, restoreIdentity } from './crypto';
+import { normalizeServerUrl, SERVER_STORAGE_KEY } from './serverUrl';
 import type { Conversation, DecryptedMessage, EncryptedMessage, Payload, Reaction, User } from './types';
 
 const REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
@@ -47,6 +48,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: User, token: string, secretKey:
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverSettings, setServerSettings] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -95,13 +97,72 @@ function AuthScreen({ onAuth }: { onAuth: (user: User, token: string, secretKey:
           <button className="primary-button" disabled={loading}>{loading ? 'Working…' : mode === 'register' ? 'Create KRYPT account' : 'Enter KRYPT'}</button>
         </form>
         <div className="security-note"><ShieldCheck size={16} /><span>Your private encryption key is backed up only in password-encrypted form.</span></div>
+        <button className="server-button" type="button" onClick={() => setServerSettings(true)}>
+          <Server size={15} /><span>Server</span><b>{new URL(API_URL).host}</b>
+        </button>
       </main>
+      {serverSettings && <ServerModal onClose={() => setServerSettings(false)} />}
     </div>
   );
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={e => e.stopPropagation()}><div className="modal-head"><h3>{title}</h3><button className="icon-button" onClick={onClose}><X size={19} /></button></div>{children}</div></div>;
+}
+
+function ServerModal({ onClose }: { onClose: () => void }) {
+  const [serverUrl, setServerUrl] = useState(API_URL);
+  const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
+
+  async function connect() {
+    setError('');
+    setChecking(true);
+    try {
+      const normalized = normalizeServerUrl(serverUrl);
+      const response = await fetch(`${normalized}/api/health`);
+      if (!response.ok) throw new Error(`Server health check failed (${response.status}).`);
+      const body = await response.json().catch(() => null);
+      if (body?.service !== 'krypt-api') throw new Error('This URL is not a KRYPT server.');
+
+      if (normalized === API_URL) {
+        onClose();
+        return;
+      }
+
+      localStorage.setItem(SERVER_STORAGE_KEY, normalized);
+      localStorage.removeItem('krypt_token');
+      localStorage.removeItem('krypt_secret');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not connect to server.');
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function useDefaultServer() {
+    localStorage.removeItem(SERVER_STORAGE_KEY);
+    localStorage.removeItem('krypt_token');
+    localStorage.removeItem('krypt_secret');
+    window.location.reload();
+  }
+
+  return <Modal title="KRYPT server" onClose={onClose}>
+    <div className="connection-card">
+      <Server size={20} />
+      <div><b>Current server</b><p>{API_URL}</p></div>
+    </div>
+    <label className="modal-label">Shared server URL
+      <input value={serverUrl} onChange={e => setServerUrl(e.target.value)} placeholder="https://krypt.example.com" autoCapitalize="none" autoCorrect="off" />
+    </label>
+    <p className="connection-help">Remote servers must use HTTPS. Localhost and 127.0.0.1 may use HTTP. Changing server signs this client out because accounts and encrypted key backups belong to that server.</p>
+    {error && <div className="error-box connection-error">{error}</div>}
+    <div className="connection-actions">
+      <button className="secondary-button" type="button" onClick={useDefaultServer}>Use app default</button>
+      <button className="primary-button" type="button" onClick={connect} disabled={checking}>{checking ? 'Checking…' : 'Connect'}</button>
+    </div>
+  </Modal>;
 }
 
 function NewChatModal({ onClose, onOpen }: { onClose: () => void; onOpen: (c: Conversation) => void }) {
@@ -132,10 +193,21 @@ function GroupModal({ onClose, onOpen }: { onClose: () => void; onOpen: (c: Conv
 }
 
 function ProfileModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: (u: User) => void }) {
-  const [displayName, setDisplayName] = useState(user.displayName); const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl || null);
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl || null);
+  const [serverSettings, setServerSettings] = useState(false);
   async function file(e: ChangeEvent<HTMLInputElement>) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 1_000_000) return alert('Avatar must be under 1 MB.'); const reader = new FileReader(); reader.onload = () => setAvatarUrl(String(reader.result)); reader.readAsDataURL(f); }
   async function save() { const updated = await api<User>('/api/me', { method: 'PATCH', body: JSON.stringify({ displayName, avatarUrl }) }); onSaved(updated); onClose(); }
-  return <Modal title="Profile & security" onClose={onClose}><div className="profile-editor"><Avatar user={{ ...user, displayName, avatarUrl }} size={76} /><label className="secondary-button file-button">Change photo<input type="file" accept="image/*" onChange={file} /></label></div><label className="modal-label">Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} /></label><div className="security-card"><ShieldCheck size={20} /><div><b>End-to-end encryption enabled</b><p>Message content is encrypted before upload. This MVP crypto layer is not yet Signal/MLS audited.</p></div></div><button className="primary-button modal-action" onClick={save}>Save profile</button></Modal>;
+  return <>
+    <Modal title="Profile & security" onClose={onClose}>
+      <div className="profile-editor"><Avatar user={{ ...user, displayName, avatarUrl }} size={76} /><label className="secondary-button file-button">Change photo<input type="file" accept="image/*" onChange={file} /></label></div>
+      <label className="modal-label">Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} /></label>
+      <div className="security-card"><ShieldCheck size={20} /><div><b>End-to-end encryption enabled</b><p>Message content is encrypted before upload. This MVP crypto layer is not yet Signal/MLS audited.</p></div></div>
+      <button className="server-button modal-server-button" type="button" onClick={() => setServerSettings(true)}><Server size={15} /><span>Server</span><b>{new URL(API_URL).host}</b></button>
+      <button className="primary-button modal-action" onClick={save}>Save profile</button>
+    </Modal>
+    {serverSettings && <ServerModal onClose={() => setServerSettings(false)} />}
+  </>;
 }
 
 function MessageBubble({ message, me, conversation, allMessages, onReply, onEdit, onDelete, onReact }: { message: DecryptedMessage; me: User; conversation: Conversation; allMessages: DecryptedMessage[]; onReply: () => void; onEdit: () => void; onDelete: () => void; onReact: (emoji: string) => void }) {
