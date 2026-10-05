@@ -47,3 +47,16 @@ export type Payload =
   | { kind: 'image'; dataUrl: string; caption?: string };
 
 export type DecryptedMessage = EncryptedMessage & { payload?: Payload | null };
+
+
+export type Device = {
+  id: string;
+  name: string;
+  platform: string;
+  publicKey: string;
+  keyVersion: number;
+  createdAt: string;
+  lastSeenAt: string;
+  revokedAt?: string | null;
+  current: boolean;
+};
