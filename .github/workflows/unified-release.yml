@@ -246,12 +246,6 @@ jobs:
             artifact: release-macos-x64
             paths: |
               release/*.dmg
-          - name: macOS Apple Silicon
-            os: macos-15
-            command: npm run desktop:mac:arm64
-            artifact: release-macos-arm64
-            paths: |
-              release/*.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -294,11 +288,13 @@ jobs:
           NOTES="docs/releases/v$VERSION.md"
           test -f "$NOTES"
 
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "KRYPT v$VERSION" \
-            --notes-file "$NOTES"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "KRYPT v$VERSION" \
+              --notes-file "$NOTES"
+          fi
 
           find release-assets -maxdepth 1 -type f -print0 | while IFS= read -r -d '' file; do
             gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY" --clobber
