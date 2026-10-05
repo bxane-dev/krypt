@@ -56,6 +56,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .security-note { display: flex; gap: 8px; align-items: flex-start; color: #747b85; font-size: 11px; line-height: 1.5; margin-top: 18px; }
 .security-note svg { flex: 0 0 auto; margin-top: 1px; }
 
+.server-button { width: 100%; margin-top: 14px; min-height: 40px; border: 1px solid var(--line); background: #0a0c0f; color: #8f96a0; border-radius: 9px; padding: 0 11px; display: flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+.server-button:hover { background: #111419; color: #d9dde3; }
+.server-button span { font-size: 11px; font-weight: 700; }
+.server-button b { margin-left: auto; max-width: 62%; color: #c5cad1; font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .boot { height: 100%; display: grid; place-items: center; background: var(--bg); }
 .app-shell { height: 100vh; display: grid; grid-template-columns: 310px minmax(0, 1fr); background: var(--bg); }
 .app-shell:has(.details-panel) { grid-template-columns: 310px minmax(0, 1fr) 300px; }
@@ -184,6 +189,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px; }.chips button { border: 1px solid #292e36; background: #171a20; color: #aeb4bc; padding: 5px 7px; border-radius: 999px; display: flex; align-items: center; gap: 4px; font-size: 10px; cursor: pointer; }
 .modal-action { width: calc(100% - 28px); margin: 10px 14px 14px; }
 .profile-editor { padding: 20px 14px 6px; display: flex; align-items: center; gap: 14px; }.file-button input { display: none; }
+
+.modal-server-button { width: calc(100% - 28px); margin: 14px 14px 4px; }
+.connection-card { margin: 14px; display: flex; gap: 10px; align-items: flex-start; border: 1px solid #252a31; background: #101216; border-radius: 10px; padding: 12px; color: #9aa1aa; }
+.connection-card svg { flex: 0 0 auto; margin-top: 1px; }
+.connection-card div { min-width: 0; }
+.connection-card b { display: block; color: #d4d8de; font-size: 11px; margin-bottom: 4px; }
+.connection-card p { margin: 0; color: #777f89; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.connection-help { margin: -2px 14px 12px; color: #737a84; font-size: 10px; line-height: 1.55; }
+.connection-error { margin: 0 14px 12px; }
+.connection-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
+.connection-actions .primary-button { min-height: 39px; }
 
 @media (max-width: 1000px) {
   .app-shell:has(.details-panel) { grid-template-columns: 280px minmax(0, 1fr); }
