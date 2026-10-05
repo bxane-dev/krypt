@@ -8,8 +8,9 @@ import { Server } from 'socket.io';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from './db.js';
-import { requireAuth, signToken, verifyToken, type AuthedRequest } from './auth.js';
+import { requireAuth, signToken, verifyActiveSession, type AuthedRequest } from './auth.js';
 import { createOriginPolicy, parseAllowedOrigins } from './origins.js';
+import { createAttemptLimiter, normalizeDeviceLabel } from './security.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -34,6 +35,87 @@ app.use(express.json({ limit: '8mb' }));
 
 const now = () => new Date().toISOString();
 const userFields = `id, username, display_name as displayName, public_key as publicKey, avatar_url as avatarUrl, created_at as createdAt`;
+const authIpLimiter = createAttemptLimiter({ maxAttempts: 30, windowMs: 10 * 60_000 });
+const authIdentityLimiter = createAttemptLimiter({ maxAttempts: 10, windowMs: 10 * 60_000 });
+const deviceSchema = z.object({
+  id: z.string().min(6).max(100).nullable().optional(),
+  name: z.string().max(120).optional(),
+  platform: z.string().max(48).optional(),
+  publicKey: z.string().max(500).optional()
+}).optional();
+
+function authIdentityKey(req: express.Request) {
+  return String(req.body?.username || '').trim().toLowerCase() || 'anonymous';
+}
+
+function authRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const ipResult = authIpLimiter.consume(req.ip || 'unknown');
+  const identityResult = authIdentityLimiter.consume(authIdentityKey(req));
+  const blocked = !ipResult.allowed ? ipResult : !identityResult.allowed ? identityResult : null;
+  if (!blocked) return next();
+  res.setHeader('Retry-After', String(Math.ceil(blocked.retryAfterMs / 1000)));
+  return res.status(429).json({ error: 'Too many authentication attempts. Try again later.' });
+}
+
+function createDeviceSession(user: { id: string; username: string }, input?: z.infer<typeof deviceSchema>) {
+  const device = input || {};
+  const at = now();
+  let deviceId = device.id || '';
+  const existing = deviceId
+    ? db.prepare('SELECT id,user_id,revoked_at FROM devices WHERE id=?').get(deviceId) as any
+    : null;
+
+  if (!existing || existing.user_id !== user.id || existing.revoked_at) {
+    deviceId = nanoid();
+    db.prepare(`
+      INSERT INTO devices (id,user_id,name,platform,public_key,key_version,created_at,last_seen_at)
+      VALUES (?,?,?,?,?,1,?,?)
+    `).run(
+      deviceId,
+      user.id,
+      normalizeDeviceLabel(device.name),
+      (device.platform || 'Legacy').slice(0, 48),
+      (device.publicKey || '').slice(0, 500),
+      at,
+      at
+    );
+  } else {
+    db.prepare(`
+      UPDATE devices
+      SET name=?, platform=?, public_key=CASE WHEN ?<>'' THEN ? ELSE public_key END, last_seen_at=?
+      WHERE id=? AND user_id=?
+    `).run(
+      normalizeDeviceLabel(device.name),
+      (device.platform || 'Legacy').slice(0, 48),
+      device.publicKey || '',
+      device.publicKey || '',
+      at,
+      deviceId,
+      user.id
+    );
+    db.prepare('UPDATE sessions SET revoked_at=? WHERE device_id=? AND revoked_at IS NULL').run(at, deviceId);
+  }
+
+  const sessionId = nanoid();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString();
+  db.prepare(`
+    INSERT INTO sessions (id,user_id,device_id,created_at,last_seen_at,expires_at)
+    VALUES (?,?,?,?,?,?)
+  `).run(sessionId, user.id, deviceId, at, at, expiresAt);
+
+  return {
+    deviceId,
+    sessionId,
+    token: signToken({ id: user.id, username: user.username, sessionId, deviceId })
+  };
+}
+
+function revokeSessions(sessionIds: string[]) {
+  for (const sessionId of sessionIds) {
+    io.to(`session:${sessionId}`).emit('session:revoked');
+    io.in(`session:${sessionId}`).disconnectSockets(true);
+  }
+}
 
 function isMember(conversationId: string, userId: string) {
   return !!db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id=? AND user_id=?').get(conversationId, userId);
@@ -70,33 +152,87 @@ function viewMessage(row: any, userId: string, reactions: any[] = []) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'krypt-api' }));
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authRateLimit, async (req, res) => {
   const parsed = z.object({
     username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/),
     displayName: z.string().trim().min(1).max(48),
     password: z.string().min(8).max(200),
     publicKey: z.string().min(20).max(500),
     keyBackup: z.string().min(20),
-    keySalt: z.string().min(8).max(200)
+    keySalt: z.string().min(8).max(200),
+    device: deviceSchema
   }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid registration data', details: parsed.error.flatten() });
-  const { username, displayName, password, publicKey, keyBackup, keySalt } = parsed.data;
+  const { username, displayName, password, publicKey, keyBackup, keySalt, device } = parsed.data;
   if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username)) return res.status(409).json({ error: 'Username already exists' });
   const id = nanoid();
   const passwordHash = await bcrypt.hash(password, 12);
   db.prepare(`INSERT INTO users (id,username,display_name,password_hash,public_key,key_backup,key_salt,created_at) VALUES (?,?,?,?,?,?,?,?)`)
     .run(id, username, displayName, passwordHash, publicKey, keyBackup, keySalt, now());
-  const token = signToken({ id, username });
-  res.status(201).json({ token, user: { id, username, displayName, publicKey, avatarUrl: null }, keyBackup, keySalt });
+  const session = createDeviceSession({ id, username }, device);
+  authIdentityLimiter.reset(username);
+  res.status(201).json({ ...session, user: { id, username, displayName, publicKey, avatarUrl: null }, keyBackup, keySalt });
 });
 
-app.post('/api/auth/login', async (req, res) => {
-  const parsed = z.object({ username: z.string().trim().toLowerCase(), password: z.string() }).safeParse(req.body);
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
+  const parsed = z.object({
+    username: z.string().trim().toLowerCase(),
+    password: z.string(),
+    device: deviceSchema
+  }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid login data' });
   const row = db.prepare('SELECT * FROM users WHERE username=?').get(parsed.data.username) as any;
   if (!row || !(await bcrypt.compare(parsed.data.password, row.password_hash))) return res.status(401).json({ error: 'Invalid username or password' });
-  const token = signToken({ id: row.id, username: row.username });
-  res.json({ token, user: { id: row.id, username: row.username, displayName: row.display_name, publicKey: row.public_key, avatarUrl: row.avatar_url }, keyBackup: row.key_backup, keySalt: row.key_salt });
+  const session = createDeviceSession({ id: row.id, username: row.username }, parsed.data.device);
+  authIdentityLimiter.reset(parsed.data.username);
+  res.json({ ...session, user: { id: row.id, username: row.username, displayName: row.display_name, publicKey: row.public_key, avatarUrl: row.avatar_url }, keyBackup: row.key_backup, keySalt: row.key_salt });
+});
+
+app.post('/api/auth/logout', requireAuth, (req: AuthedRequest, res) => {
+  const at = now();
+  db.prepare('UPDATE sessions SET revoked_at=? WHERE id=? AND user_id=?').run(at, req.user!.sessionId, req.user!.id);
+  revokeSessions([req.user!.sessionId]);
+  res.status(204).end();
+});
+
+app.get('/api/devices', requireAuth, (req: AuthedRequest, res) => {
+  const rows = db.prepare(`
+    SELECT id, name, platform, public_key as publicKey, key_version as keyVersion,
+      created_at as createdAt, last_seen_at as lastSeenAt, revoked_at as revokedAt
+    FROM devices
+    WHERE user_id=?
+    ORDER BY revoked_at IS NOT NULL, last_seen_at DESC
+  `).all(req.user!.id) as any[];
+  res.json(rows.map(row => ({ ...row, current: row.id === req.user!.deviceId })));
+});
+
+app.delete('/api/devices/:id', requireAuth, (req: AuthedRequest, res) => {
+  const deviceId = String(req.params.id);
+  const device = db.prepare('SELECT id FROM devices WHERE id=? AND user_id=?').get(deviceId, req.user!.id);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
+  const sessions = db.prepare('SELECT id FROM sessions WHERE device_id=? AND user_id=? AND revoked_at IS NULL').all(deviceId, req.user!.id) as any[];
+  const at = now();
+  db.transaction(() => {
+    db.prepare('UPDATE devices SET revoked_at=? WHERE id=? AND user_id=?').run(at, deviceId, req.user!.id);
+    db.prepare('UPDATE sessions SET revoked_at=? WHERE device_id=? AND user_id=? AND revoked_at IS NULL').run(at, deviceId, req.user!.id);
+  })();
+  revokeSessions(sessions.map(row => row.id));
+  res.status(204).end();
+});
+
+app.post('/api/devices/:id/key', requireAuth, (req: AuthedRequest, res) => {
+  const deviceId = String(req.params.id);
+  if (deviceId !== req.user!.deviceId) return res.status(403).json({ error: 'Only the current device can rotate its verification key' });
+  const parsed = z.object({ publicKey: z.string().min(20).max(500) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid verification key' });
+  const at = now();
+  db.prepare(`
+    UPDATE devices
+    SET public_key=?, key_version=key_version+1, last_seen_at=?
+    WHERE id=? AND user_id=? AND revoked_at IS NULL
+  `).run(parsed.data.publicKey, at, deviceId, req.user!.id);
+  const row = db.prepare('SELECT key_version as keyVersion FROM devices WHERE id=?').get(deviceId) as any;
+  res.json({ deviceId, keyVersion: row?.keyVersion || 1 });
 });
 
 app.get('/api/me', requireAuth, (req: AuthedRequest, res) => {
@@ -230,7 +366,7 @@ io.use((socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
     if (!token) throw new Error('No token');
-    socket.data.user = verifyToken(token);
+    socket.data.user = verifyActiveSession(token);
     next();
   } catch {
     next(new Error('Unauthorized'));
@@ -241,6 +377,7 @@ const online = new Map<string, number>();
 io.on('connection', socket => {
   const user = socket.data.user as { id: string; username: string };
   socket.join(`user:${user.id}`);
+  socket.join(`session:${user.sessionId}`);
   const rows = db.prepare('SELECT conversation_id as id FROM conversation_members WHERE user_id=?').all(user.id) as any[];
   for (const row of rows) socket.join(`conversation:${row.id}`);
   online.set(user.id, (online.get(user.id) || 0) + 1);
