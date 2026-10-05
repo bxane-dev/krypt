@@ -6,7 +6,7 @@ All notable KRYPT changes are tracked here.
 
 ### Added
 - Unified GitHub Release pipeline for mobile and desktop packages.
-- macOS DMG packaging.
+- macOS DMG packaging for Intel x64 and Apple Silicon arm64.
 - Android APK, iOS IPA, Windows NSIS, Linux AppImage/DEB, and macOS DMG in one release.
 - Versioned release notes and changelog assets.
 - Automatic release creation when a new package version reaches `main`.
@@ -20,7 +20,7 @@ All notable KRYPT changes are tracked here.
 - Android APK is debug-signed and directly installable.
 - iOS publishes a signed IPA only when Apple signing secrets are configured; otherwise it publishes an unsigned iPhoneOS IPA plus a signing notice.
 - Windows, Linux, and macOS desktop packages are currently unsigned.
-- macOS DMG is x64 and runs on Intel Macs and Apple Silicon Macs through Rosetta 2.
+- macOS ships separate native x64 and arm64 DMGs.
 
 ## [0.5.1] - 2026-10-05
 
