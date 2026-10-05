@@ -25,7 +25,8 @@
     "mobile:web": "npm run build -w @krypt/web",
     "mobile:android": "npm run mobile:web && npx cap sync android",
     "mobile:ios": "npm run mobile:web && npx cap sync ios",
-    "desktop:mac": "npm run build && electron-builder --mac dmg --x64 --arm64 --publish never"
+    "desktop:mac:x64": "npm run build && electron-builder --mac dmg --x64 --publish never",
+    "desktop:mac:arm64": "npm run build && electron-builder --mac dmg --arm64 --publish never"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
