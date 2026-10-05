@@ -1,24 +1,22 @@
-function resolveApiUrl() {
-  if (typeof window !== 'undefined') {
-    const localOverride = new URLSearchParams(window.location.search).get('desktopApi');
-    if (localOverride) {
-      try {
-        const url = new URL(localOverride);
-        if (url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost')) {
-          return url.origin;
-        }
-      } catch {
-        // Ignore malformed desktop-only overrides.
-      }
-    }
-  }
+import { resolveApiUrl, SERVER_STORAGE_KEY } from './serverUrl';
 
-  const configured = import.meta.env.VITE_API_URL?.trim();
-  if (configured) return configured.replace(/\/$/, '');
-  return 'http://localhost:8787';
+function readStoredServerUrl() {
+  try {
+    return localStorage.getItem(SERVER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-const API_URL = resolveApiUrl();
+const desktopApi = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search).get('desktopApi')
+  : null;
+
+const API_URL = resolveApiUrl({
+  storedUrl: readStoredServerUrl(),
+  desktopApi,
+  configuredApi: import.meta.env.VITE_API_URL?.trim() || null
+});
 
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('krypt_token');
@@ -34,4 +32,4 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
   return response.json();
 }
 
-export { API_URL };
+export { API_URL, SERVER_STORAGE_KEY };
