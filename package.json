@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "concurrently -n server,web -c auto \"npm run dev -w @krypt/server\" \"npm run dev -w @krypt/web\"",
     "build": "npm run build -w @krypt/server && npm run build -w @krypt/web && npm run build -w @krypt/desktop",
-    "test": "npm run test -w @krypt/web",
+    "test": "npm run test -w @krypt/server && npm run test -w @krypt/web",
     "start": "npm run start -w @krypt/server",
     "desktop:dev": "npm run build && electron .",
     "desktop:win": "npm run build && electron-builder --win nsis --x64 --publish never",
