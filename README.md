@@ -15,6 +15,10 @@ KRYPT is an open-source encrypted chat application with accounts, direct message
 - Live typing indicators and online presence via Socket.IO
 - Responsive three-pane chat UI
 - Selectable shared-server connection for web and installed desktop clients
+- Server-backed, revocable login sessions
+- Per-device verification identities with key versions
+- Device list with remote session/device revocation
+- Authentication throttling for login and registration
 - SQLite persistence with zero external database requirement
 - MIT licensed
 
@@ -22,7 +26,7 @@ KRYPT is an open-source encrypted chat application with accounts, direct message
 
 - **Web:** React, TypeScript, Vite, TweetNaCl, Socket.IO client
 - **Server:** Node.js, Express, TypeScript, Socket.IO, SQLite
-- **Security:** NaCl box encryption in-browser, PBKDF2 + AES-GCM private-key backup, bcrypt password hashing, JWT sessions
+- **Security:** NaCl box encryption in-browser, PBKDF2 + AES-GCM private-key backup, bcrypt password hashing, JWTs backed by revocable server sessions
 
 ## Local setup
 
@@ -43,6 +47,18 @@ KRYPT clients can connect to one shared HTTPS server instead of using the bundle
 Changing servers clears the local login session and encryption secret. Accounts and password-encrypted private-key backups belong to the server where the account was created.
 
 Remote server URLs must use HTTPS. Plain HTTP is accepted only for `localhost` and `127.0.0.1` development servers.
+
+## Devices and sessions
+
+KRYPT 0.4.0 introduces server-backed sessions tied to device records. Tokens are accepted only while their session and device are still active. Removing a device revokes all active sessions for that device, including WebSocket access.
+
+Each client also creates a separate local verification signing identity. Its public key and key version are stored with the device record. This is a foundation for future device verification and key transparency; it is **not yet used as the message-encryption ratchet**.
+
+The Profile & security screen shows current and previously revoked devices. The current device can rotate its verification key, and other active devices can be remotely removed.
+
+Upgrading a server from 0.3.x invalidates old stateless JWT sessions, so users must sign in once again after the upgrade.
+
+Authentication endpoints include in-memory throttling. For horizontally scaled production deployments, move this limiter to a shared store such as Redis/Key Value.
 
 ### Render deployment
 
@@ -82,8 +98,9 @@ Recommended production changes before public launch:
 2. Put the API behind HTTPS only.
 3. Move SQLite to PostgreSQL/libSQL for multi-instance deployments.
 4. Add object storage for large encrypted attachments.
-5. Add email verification, rate limiting backed by Redis, abuse reporting, and account recovery.
-6. Run an independent security audit.
+5. Move authentication throttling to Redis/Key Value before horizontal scaling.
+6. Add email verification, abuse reporting, and account recovery.
+7. Run an independent security audit.
 
 ## Environment variables
 
