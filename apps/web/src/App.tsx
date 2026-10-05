@@ -137,6 +137,9 @@ function ServerModal({ onClose }: { onClose: () => void }) {
         return;
       }
 
+      if (localStorage.getItem('krypt_token')) {
+        await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+      }
       localStorage.setItem(SERVER_STORAGE_KEY, normalized);
       localStorage.removeItem('krypt_token');
       localStorage.removeItem('krypt_secret');
@@ -149,7 +152,10 @@ function ServerModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function useDefaultServer() {
+  async function useDefaultServer() {
+    if (localStorage.getItem('krypt_token')) {
+      await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+    }
     localStorage.removeItem(SERVER_STORAGE_KEY);
     localStorage.removeItem('krypt_token');
     localStorage.removeItem('krypt_secret');
@@ -258,7 +264,7 @@ function ProfileModal({ user, onClose, onSaved }: { user: User; onClose: () => v
       <label className="modal-label">Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} /></label>
       <div className="security-card"><ShieldCheck size={20} /><div><b>End-to-end encryption enabled</b><p>Message content is encrypted before upload. Device verification identities are separate from the current MVP message key.</p></div></div>
       <div className="device-section">
-        <div className="device-section-head"><div><b>Logged-in devices</b><span>Remove sessions you no longer trust.</span></div><MonitorSmartphone size={19} /></div>
+        <div className="device-section-head"><div><b>Known devices</b><span>Remove devices you no longer trust.</span></div><MonitorSmartphone size={19} /></div>
         {deviceError && <div className="error-box">{deviceError}</div>}
         <div className="device-list">
           {devices.map(device => <div className={`device-row ${device.revokedAt ? 'revoked' : ''}`} key={device.id}>
