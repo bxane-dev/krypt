@@ -19,7 +19,14 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; min-height: 100%; height: 100%; }
-body { overflow: hidden; background: var(--bg); }
+html { background: var(--bg); overscroll-behavior: none; }
+body {
+  overflow: hidden;
+  background: var(--bg);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
 button, input, textarea { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -226,6 +233,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 }
 @media (max-width: 720px) {
   .mobile-only { display: grid; }
+  .auth-page { min-height: 100dvh; padding: calc(22px + env(safe-area-inset-top)) 14px calc(22px + env(safe-area-inset-bottom)); }
+  .app-shell, .chat-panel { height: 100dvh; }
+  .sidebar-head, .chat-header { padding-top: env(safe-area-inset-top); height: calc(62px + env(safe-area-inset-top)); }
+  .sidebar-head { min-height: calc(62px + env(safe-area-inset-top)); }
+  .profile-row { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .composer-wrap { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .details-panel { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .modal-backdrop { padding: calc(12px + env(safe-area-inset-top)) 10px calc(12px + env(safe-area-inset-bottom)); }
+  .modal { max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px); }
+  .message-actions { position: static; display: flex; width: fit-content; margin-top: 5px; box-shadow: none; }
+  .mine .message-actions { margin-left: auto; }
+  .reaction-picker:focus-within .reaction-pop { display: flex; }
+  .reaction-pop { left: auto; right: -32px; bottom: 33px; }
+  button, .profile-row, .conversation-row, .user-row { touch-action: manipulation; }
   .app-shell, .app-shell:has(.details-panel) { display: block; }
   .sidebar { position: fixed; inset: 0; width: 100%; z-index: 10; transform: translateX(-100%); transition: transform .2s ease; }
   .sidebar.mobile-open { transform: translateX(0); }
