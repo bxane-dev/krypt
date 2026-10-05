@@ -97,7 +97,7 @@ GitHub Actions builds both platforms:
 
 The hosted KRYPT API supports the native WebView origins only when `ALLOW_MOBILE_ORIGINS=true`. The included Render Blueprint enables this.
 
-KRYPT v0.6.0 uses a unified GitHub Release pipeline. A new version on `main` builds Android, iOS, Windows, Linux, and native Intel/Apple Silicon macOS packages and publishes them together under one GitHub Release. The older mobile and desktop workflows remain manual-only for diagnostics.
+KRYPT v0.6.0 uses a unified GitHub Release pipeline. A new version on `main` builds Android, iOS, Windows, Linux, and macOS packages and publishes them together under one GitHub Release. The older mobile and desktop workflows remain manual-only for diagnostics.
 
 ## GitHub Releases
 
@@ -108,8 +108,7 @@ Official packages are published together at **GitHub → Releases**. Each releas
 - Windows x64 NSIS installer
 - Linux x64 AppImage
 - Debian/Ubuntu x64 DEB
-- macOS Intel DMG
-- macOS Apple Silicon DMG
+- macOS x64 DMG (Apple Silicon supported via Rosetta 2)
 - `CHANGELOG.md`
 
 The `.github/workflows/unified-release.yml` workflow checks the version in `package.json`. When a version reaches `main` and no matching release exists, it builds every target, creates the `v<version>` tag/release, attaches all installers, and verifies the release contains the expected assets.
