@@ -1,8 +1,8 @@
 {
   "name": "krypt",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "Open-source encrypted chat for web and desktop",
+  "description": "Open-source encrypted chat for mobile, web, and desktop",
   "author": {
     "name": "bxane-dev",
     "email": "noreply@github.com",
@@ -21,7 +21,10 @@
     "desktop:dev": "npm run build && electron .",
     "desktop:win": "npm run build && electron-builder --win nsis --x64 --publish never",
     "desktop:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
-    "desktop:dist": "npm run build && electron-builder --publish never"
+    "desktop:dist": "npm run build && electron-builder --publish never",
+    "mobile:web": "npm run build -w @krypt/web",
+    "mobile:android": "npm run mobile:web && npx cap sync android",
+    "mobile:ios": "npm run mobile:web && npx cap sync ios"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -38,7 +41,11 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "electron": "44.5.1",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/ios": "8.5.2"
   },
   "engines": {
     "node": ">=22.12.0"
