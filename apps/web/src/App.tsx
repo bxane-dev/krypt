@@ -2,13 +2,17 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, t
 import { io, type Socket } from 'socket.io-client';
 import {
   ArrowLeft, Check, Image as ImageIcon, LockKeyhole, LogOut, Menu, MessageCircle,
-  MoreHorizontal, Paperclip, Pencil, Plus, Reply, Search, Send, Server, Settings, ShieldCheck,
-  SmilePlus, Trash2, UserPlus, Users, X
+  MonitorSmartphone, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Reply, Search, Send,
+  Server, Settings, ShieldCheck, ShieldX, SmilePlus, Trash2, UserPlus, Users, X
 } from 'lucide-react';
 import { api, API_URL } from './api';
 import { createIdentity, decryptEnvelope, encryptForMembers, restoreIdentity } from './crypto';
 import { normalizeServerUrl, SERVER_STORAGE_KEY } from './serverUrl';
-import type { Conversation, DecryptedMessage, EncryptedMessage, Payload, Reaction, User } from './types';
+import {
+  clearServerDeviceId, DEVICE_ID_KEY, getOrCreateDeviceIdentity,
+  rotateDeviceIdentity, saveServerDeviceId
+} from './deviceIdentity';
+import type { Conversation, DecryptedMessage, Device, EncryptedMessage, Payload, Reaction, User } from './types';
 
 const REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
 
@@ -54,22 +58,25 @@ function AuthScreen({ onAuth }: { onAuth: (user: User, token: string, secretKey:
     e.preventDefault();
     setError(''); setLoading(true);
     try {
+      const device = getOrCreateDeviceIdentity();
       if (mode === 'register') {
         const identity = await createIdentity(password);
-        const result = await api<{ token: string; user: User }>('/api/auth/register', {
+        const result = await api<{ token: string; deviceId: string; user: User }>('/api/auth/register', {
           method: 'POST',
-          body: JSON.stringify({ username, displayName, password, publicKey: identity.publicKey, keyBackup: identity.keyBackup, keySalt: identity.keySalt })
+          body: JSON.stringify({ username, displayName, password, publicKey: identity.publicKey, keyBackup: identity.keyBackup, keySalt: identity.keySalt, device })
         });
         localStorage.setItem('krypt_token', result.token);
         localStorage.setItem('krypt_secret', identity.secretKey);
+        saveServerDeviceId(result.deviceId);
         onAuth(result.user, result.token, identity.secretKey);
       } else {
-        const result = await api<{ token: string; user: User; keyBackup: string; keySalt: string }>('/api/auth/login', {
-          method: 'POST', body: JSON.stringify({ username, password })
+        const result = await api<{ token: string; deviceId: string; user: User; keyBackup: string; keySalt: string }>('/api/auth/login', {
+          method: 'POST', body: JSON.stringify({ username, password, device })
         });
         const secretKey = await restoreIdentity(password, result.keyBackup, result.keySalt);
         localStorage.setItem('krypt_token', result.token);
         localStorage.setItem('krypt_secret', secretKey);
+        saveServerDeviceId(result.deviceId);
         onAuth(result.user, result.token, secretKey);
       }
     } catch (err) {
@@ -133,6 +140,7 @@ function ServerModal({ onClose }: { onClose: () => void }) {
       localStorage.setItem(SERVER_STORAGE_KEY, normalized);
       localStorage.removeItem('krypt_token');
       localStorage.removeItem('krypt_secret');
+      clearServerDeviceId();
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not connect to server.');
@@ -145,6 +153,7 @@ function ServerModal({ onClose }: { onClose: () => void }) {
     localStorage.removeItem(SERVER_STORAGE_KEY);
     localStorage.removeItem('krypt_token');
     localStorage.removeItem('krypt_secret');
+    clearServerDeviceId();
     window.location.reload();
   }
 
@@ -196,13 +205,74 @@ function ProfileModal({ user, onClose, onSaved }: { user: User; onClose: () => v
   const [displayName, setDisplayName] = useState(user.displayName);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl || null);
   const [serverSettings, setServerSettings] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [deviceError, setDeviceError] = useState('');
+  const [deviceBusy, setDeviceBusy] = useState('');
+
+  async function loadDevices() {
+    try {
+      setDeviceError('');
+      setDevices(await api<Device[]>('/api/devices'));
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Could not load devices');
+    }
+  }
+
+  useEffect(() => { loadDevices(); }, []);
+
   async function file(e: ChangeEvent<HTMLInputElement>) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 1_000_000) return alert('Avatar must be under 1 MB.'); const reader = new FileReader(); reader.onload = () => setAvatarUrl(String(reader.result)); reader.readAsDataURL(f); }
   async function save() { const updated = await api<User>('/api/me', { method: 'PATCH', body: JSON.stringify({ displayName, avatarUrl }) }); onSaved(updated); onClose(); }
+
+  async function revokeDevice(device: Device) {
+    if (device.current || device.revokedAt) return;
+    if (!confirm(`Remove ${device.name} from this KRYPT account?`)) return;
+    setDeviceBusy(device.id);
+    try {
+      await api(`/api/devices/${device.id}`, { method: 'DELETE' });
+      await loadDevices();
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Could not remove device');
+    } finally {
+      setDeviceBusy('');
+    }
+  }
+
+  async function rotateCurrentDevice() {
+    const currentId = localStorage.getItem(DEVICE_ID_KEY);
+    if (!currentId) return;
+    setDeviceBusy(currentId);
+    try {
+      const publicKey = rotateDeviceIdentity();
+      await api(`/api/devices/${currentId}/key`, { method: 'POST', body: JSON.stringify({ publicKey }) });
+      await loadDevices();
+    } catch (err) {
+      setDeviceError(err instanceof Error ? err.message : 'Could not rotate device key');
+    } finally {
+      setDeviceBusy('');
+    }
+  }
+
   return <>
     <Modal title="Profile & security" onClose={onClose}>
       <div className="profile-editor"><Avatar user={{ ...user, displayName, avatarUrl }} size={76} /><label className="secondary-button file-button">Change photo<input type="file" accept="image/*" onChange={file} /></label></div>
       <label className="modal-label">Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} /></label>
-      <div className="security-card"><ShieldCheck size={20} /><div><b>End-to-end encryption enabled</b><p>Message content is encrypted before upload. This MVP crypto layer is not yet Signal/MLS audited.</p></div></div>
+      <div className="security-card"><ShieldCheck size={20} /><div><b>End-to-end encryption enabled</b><p>Message content is encrypted before upload. Device verification identities are separate from the current MVP message key.</p></div></div>
+      <div className="device-section">
+        <div className="device-section-head"><div><b>Logged-in devices</b><span>Remove sessions you no longer trust.</span></div><MonitorSmartphone size={19} /></div>
+        {deviceError && <div className="error-box">{deviceError}</div>}
+        <div className="device-list">
+          {devices.map(device => <div className={`device-row ${device.revokedAt ? 'revoked' : ''}`} key={device.id}>
+            <div className="device-icon"><MonitorSmartphone size={17} /></div>
+            <div className="device-copy"><b>{device.name}{device.current ? ' · this device' : ''}</b><span>{device.platform} · key v{device.keyVersion} · seen {formatTime(device.lastSeenAt)}</span></div>
+            {device.current && !device.revokedAt
+              ? <button className="device-action" title="Rotate verification key" onClick={rotateCurrentDevice} disabled={deviceBusy === device.id}><RefreshCw size={15} /></button>
+              : !device.revokedAt
+                ? <button className="device-action danger" title="Remove device" onClick={() => revokeDevice(device)} disabled={deviceBusy === device.id}><ShieldX size={15} /></button>
+                : <span className="device-revoked">revoked</span>}
+          </div>)}
+          {!devices.length && !deviceError && <p className="connection-help">No device records available.</p>}
+        </div>
+      </div>
       <button className="server-button modal-server-button" type="button" onClick={() => setServerSettings(true)}><Server size={15} /><span>Server</span><b>{new URL(API_URL).host}</b></button>
       <button className="primary-button modal-action" onClick={save}>Save profile</button>
     </Modal>
@@ -234,7 +304,7 @@ function App() {
   useEffect(() => {
     (async () => {
       if (!token || !secretKey) { setBooting(false); return; }
-      try { setUser(await api<User>('/api/me')); } catch { logout(); }
+      try { setUser(await api<User>('/api/me')); } catch { clearLocalSession(); }
       finally { setBooting(false); }
     })();
   }, []);
@@ -281,6 +351,7 @@ function App() {
     socket.on('reaction:update', ({ messageId, reactions }) => setMessages(prev => prev.map(x => x.id === messageId ? { ...x, reactions } : x)));
     socket.on('typing', ({ conversationId, username, isTyping }) => setTyping(prev => { const set = new Set(prev[conversationId] || []); isTyping ? set.add(username) : set.delete(username); return { ...prev, [conversationId]: [...set] }; }));
     socket.on('presence:update', ({ userId, online: isOnline }) => setOnline(prev => ({ ...prev, [userId]: isOnline })));
+    socket.on('session:revoked', () => clearLocalSession());
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [user?.id, token, secretKey]);
 
@@ -322,7 +393,21 @@ function App() {
 
   function openConversation(c: Conversation) { setConversations(prev => prev.some(x => x.id === c.id) ? prev.map(x => x.id === c.id ? c : x) : [c, ...prev]); setSelectedId(c.id); setSidebarOpen(false); socketRef.current?.emit('conversation:join', c.id); }
 
-  function logout() { localStorage.removeItem('krypt_token'); localStorage.removeItem('krypt_secret'); setToken(''); setSecretKey(''); setUser(null); setConversations([]); setMessages([]); }
+  function clearLocalSession() {
+    localStorage.removeItem('krypt_token');
+    localStorage.removeItem('krypt_secret');
+    setToken('');
+    setSecretKey('');
+    setUser(null);
+    setConversations([]);
+    setMessages([]);
+  }
+
+  async function logout() {
+    try { await api('/api/auth/logout', { method: 'POST' }); }
+    catch { /* Local logout must still complete if the server is unavailable. */ }
+    finally { clearLocalSession(); }
+  }
 
   if (booting) return <div className="boot"><div className="brand"><span className="brand-mark"><LockKeyhole size={20} /></span>KRYPT</div></div>;
   if (!user) return <AuthScreen onAuth={(u, t, s) => { setUser(u); setToken(t); setSecretKey(s); }} />;
