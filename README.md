@@ -78,7 +78,7 @@ After the Blueprint is applied, set `WEB_ORIGINS` to any browser origins that sh
 
 ## Mobile builds
 
-KRYPT 0.5.0 is mobile-first.
+KRYPT 0.5.x is mobile-first.
 
 ```bash
 npm install
@@ -92,8 +92,8 @@ npx cap sync
 
 GitHub Actions builds both platforms:
 
-- **Android APK:** debug-signed and directly installable on Android.
-- **iOS IPA:** native iPhoneOS Release build packaged as an unsigned IPA. Apple signing is required before installation on a stock iPhone, TestFlight, or App Store distribution. See `docs/ios-signing.md`.
+- **Android APK:** debug-signed and directly installable on Android; the native version name is synchronized with KRYPT's package version.
+- **iOS IPA:** always builds a Release iPhoneOS compile-check IPA. When the four documented Apple signing secrets are configured, CI additionally archives and exports a signed IPA using Xcode. See `docs/ios-signing.md`.
 
 The hosted KRYPT API supports the native WebView origins only when `ALLOW_MOBILE_ORIGINS=true`. The included Render Blueprint enables this.
 
